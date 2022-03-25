@@ -1,0 +1,42 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+      "adminUsername": {
+        "value": "testadmin"
+      },
+      "existingVnetName": {
+        "value": "vnetname"
+      },
+      "existingSubnetName": {
+        "value": "default"
+      },
+      "vmSize": {
+        "value": "Standard_B2s"
+      },
+      "domainToJoin": {
+        "value": "domain.local"
+      },
+      "domainUsername": {
+        "value": "joindomain_account"
+      },
+      "domainPassword": {
+        "reference": {
+          "keyvault": {
+          "id": "/subscriptions/<subscriptionid>/resourceGroups/<resourcegroup the keyvault is in>/providers/Microsoft.KeyVault/vaults/<keyvault name>"
+          },
+          "secretName": "testvmadmin"
+        }
+      },
+      "domainJoinOptions": {
+        "value": 3
+      },
+      "servername": {
+        "value": "testvmname"
+      },
+      "virtualNetworkResourceGroup":{
+      "value": "RG-NAME_OF_NETWORK_RG"
+      }
+
+    }
+  }

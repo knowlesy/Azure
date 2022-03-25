@@ -1,0 +1,216 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "metadata": {
+      "_generator": {
+        "name": "bicep",
+        "version": "0.4.412.5873",
+        "templateHash": "9170108035308691982"
+      }
+    },
+    "parameters": {
+      "vmSize": {
+        "type": "string",
+        "defaultValue": "Standard_A2_v2",
+        "metadata": {
+          "description": "Size of VM"
+        }
+      },
+      "existingVnetName": {
+        "type": "string",
+        "metadata": {
+          "description": "Existing VNET that contains the domain controller"
+        }
+      },
+       "servername":{
+         "type":"string"  
+       }, 
+       "numberofinstances": {
+        "type": "int",
+        "defaultValue": 1
+       },
+      "existingSubnetName": {
+        "type": "string",
+        "metadata": {
+          "description": "Existing subnet that contains the domain controller"
+        }
+      },
+
+      "domainToJoin": {
+        "type": "string",
+        "metadata": {
+          "description": "The FQDN of the AD domain"
+        }
+      },
+      "domainUsername": {
+        "type": "string",
+        "metadata": {
+          "description": "Username of the account on the domain"
+        }
+      },
+      "domainPassword": {
+        "type": "secureString",
+        "metadata": {
+          "description": "Password of the account on the domain"
+        }
+      },
+      "ouPath": {
+        "type": "string",
+        "defaultValue": "",
+        "metadata": {
+          "description": "Organizational Unit path in which the nodes and cluster will be present."
+        }
+      },
+      "domainJoinOptions": {
+        "type": "int",
+        "defaultValue": 3,
+        "metadata": {
+          "description": "Set of bit flags that define the join options. Default value of 3 is a combination of NETSETUP_JOIN_DOMAIN (0x00000001) & NETSETUP_ACCT_CREATE (0x00000002) i.e. will join the domain and create the account on the domain. For more information see https://msdn.microsoft.com/en-us/library/aa392154(v=vs.85).aspx"
+        }
+      },
+      "adminUsername": {
+        "type": "string",
+        "metadata": {
+          "description": "The name of the administrator of the new VM."
+        }
+      },
+      "virtualNetworkResourceGroup":{
+        "type": "string"
+      },
+      "adminPassword": {
+        "type": "secureString",
+        "metadata": {
+          "description": "The password for the administrator account of the new VM."
+        }
+      },
+
+      "location": {
+        "type": "string",
+        "defaultValue": "[resourceGroup().location]",
+        "metadata": {
+          "description": "Location for all resources."
+        }
+      }
+    },
+    "functions": [],
+    "variables": {
+      "imagePublisher": "MicrosoftWindowsServer",
+      "imageOffer": "WindowsServer",
+      "windowsOSVersion": "2019-Datacenter",
+      "nicName": "[format('{0}-nic', parameters('servername'))]",
+      "vnetID": "[resourceId(parameters('virtualNetworkResourceGroup'), 'Microsoft.Network/virtualNetworks', parameters('existingVnetName'))]",
+      "vmSubnetRef": "[concat(variables('vnetID'),'/subnets/', parameters('existingSubnetName'))]"
+    },
+    "resources": [
+     
+              {
+            "apiVersion": "2016-03-30",
+            "type": "Microsoft.Network/networkInterfaces",
+            "name": "[variables('nicName')]",
+            "location": "[resourceGroup().location]",
+            "copy": {
+                "count": "[parameters('numberOfInstances')]",
+                "name": "nicCopy"
+            },
+            "dependsOn": [
+
+            ],
+            "properties": {
+                "ipConfigurations": [
+                    {
+                        "name": "ipconfig1",
+                        "properties": {
+                            "privateIPAllocationMethod": "Dynamic",
+                             "subnet": {
+                                "id": "[variables('vmSubnetRef')]"
+                            },
+                            "loadBalancerBackendAddressPools": [
+
+                            ]
+                        }
+                    }
+                ],
+                "enableIPForwarding": false
+            }
+        },
+      {
+        "type": "Microsoft.Compute/virtualMachines",
+        "apiVersion": "2021-03-01",
+        "name": "[parameters('servername')]",
+        "location": "[parameters('location')]",
+        "properties": {
+          "hardwareProfile": {
+            "vmSize": "[parameters('vmSize')]"
+          },
+          "osProfile": {
+            "computerName": "[parameters('servername')]",
+            "adminUsername": "[parameters('adminUsername')]",
+            "adminPassword": "[parameters('adminPassword')]"
+          },
+          "storageProfile": {
+            "imageReference": {
+              "publisher": "[variables('imagePublisher')]",
+              "offer": "[variables('imageOffer')]",
+              "sku": "[variables('windowsOSVersion')]",
+              "version": "latest"
+            },
+            "osDisk": {
+              "name": "[format('{0}-OsDisk', parameters('servername'))]",
+              "caching": "ReadWrite",
+              "createOption": "FromImage"
+            },
+            "dataDisks": [
+              {
+                "name": "[format('{0}-DataDisk', parameters('servername'))]",
+                "caching": "None",
+                "createOption": "Empty",
+                "diskSizeGB": 1024,
+                "lun": 0
+              }
+            ]
+          },
+          "networkProfile": {
+            "networkInterfaces": [
+              {
+                "id": "[resourceId('Microsoft.Network/networkInterfaces', variables('nicName'))]"
+              }
+            ]
+          },
+          "diagnosticsProfile": {
+            "bootDiagnostics": {
+              "enabled": false
+              
+            }
+          }
+        },
+        "dependsOn": [
+          "[resourceId('Microsoft.Network/networkInterfaces', variables('nicName'))]"
+        ]
+      },
+      {
+        "type": "Microsoft.Compute/virtualMachines/extensions",
+        "apiVersion": "2021-03-01",
+        "name": "[format('{0}/{1}', parameters('servername'), 'joindomain')]",
+        "location": "[parameters('location')]",
+        "properties": {
+          "publisher": "Microsoft.Compute",
+          "type": "JsonADDomainExtension",
+          "typeHandlerVersion": "1.3",
+          "autoUpgradeMinorVersion": true,
+          "settings": {
+            "name": "[parameters('domainToJoin')]",
+            "ouPath": "[parameters('ouPath')]",
+            "user": "[format('{0}\\{1}', parameters('domainToJoin'), parameters('domainUsername'))]",
+            "restart": true,
+            "options": "[parameters('domainJoinOptions')]"
+          },
+          "protectedSettings": {
+            "Password": "[parameters('domainPassword')]"
+          }
+        },
+        "dependsOn": [
+          "[resourceId('Microsoft.Compute/virtualMachines', parameters('servername'))]"
+        ]
+      }
+    ]
+  }
