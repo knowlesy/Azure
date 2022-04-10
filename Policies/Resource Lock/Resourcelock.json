@@ -21,16 +21,18 @@
      },
      "policyRule": {
        "if": {
-         "allOf": [
-           {
-             "field": "type",
-             "equals": "Microsoft.Compute/virtualMachines"
-           },
-           {
-             "field": "[concat('tags[', parameters('tagName'), ']')]",
-             "equals": "[parameters('tagValue')]"
-           }
-         ]
+        "allOf": [
+          {
+            "field": "[concat('tags[', parameters('tagName'), ']')]",
+            "equals": "[parameters('tagValue')]"
+          },
+          {
+            "not": {
+              "field": "type",
+              "like": "microsoft.authorization/locks"
+            }
+          }
+        ]
        },
        "then": {
          "effect": "deployIfNotExists",
